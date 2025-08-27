@@ -139,20 +139,23 @@ def convert_pdf_to_excel(pdf_path, xlsx_path):
         if os.path.getsize(pdf_path) == 0:
             return False, "PDF file is empty"
         
-        # Extract all tables from the PDF
+        # Extract all tables from the PDF with enhanced formatting detection
         try:
-            # Use tabula to extract tables with multiple options for better formatting
+            # First attempt: Use lattice mode for structured tables with better area detection
             dfs = tabula.read_pdf(
                 pdf_path, 
-                pages='all',  # Extract from all pages
-                multiple_tables=True,  # Extract multiple tables
-                pandas_options={'header': 'infer'},  # Try to detect headers
-                stream=True,  # Use stream mode for better table detection
-                guess=True,  # Let tabula guess the table format
-                lattice=True  # Use lattice mode for better structured tables
+                pages='all',
+                multiple_tables=True,
+                pandas_options={'header': 'infer'},
+                lattice=True,
+                stream=False,
+                guess=False,
+                area=None,  # Auto-detect table areas
+                relative_area=True,  # Use relative coordinates
+                relative_columns=True  # Use relative column positions
             )
             
-            # If no tables found with lattice mode, try stream mode
+            # Second attempt: Stream mode with better column detection
             if not dfs or len(dfs) == 0:
                 dfs = tabula.read_pdf(
                     pdf_path, 
@@ -160,17 +163,21 @@ def convert_pdf_to_excel(pdf_path, xlsx_path):
                     multiple_tables=True,
                     pandas_options={'header': 'infer'},
                     stream=True,
-                    guess=True
+                    guess=True,
+                    relative_area=True,
+                    relative_columns=True
                 )
             
-            # If still no tables, try extracting as raw text and convert to table
+            # Third attempt: More aggressive extraction with custom settings
             if not dfs or len(dfs) == 0:
-                # Fallback: extract as area-based tables
                 dfs = tabula.read_pdf(
                     pdf_path,
                     pages='all',
                     multiple_tables=True,
-                    pandas_options={'header': None}
+                    pandas_options={'header': None},
+                    lattice=False,
+                    stream=True,
+                    guess=False
                 )
                 
         except Exception as tabula_error:
@@ -202,25 +209,46 @@ def convert_pdf_to_excel(pdf_path, xlsx_path):
                         # Get the worksheet to apply formatting
                         worksheet = writer.sheets[sheet_name]
                         
-                        # Auto-adjust column widths
+                        # Enhanced formatting and styling
+                        from openpyxl.styles import Border, Side, Font, Alignment, PatternFill
+                        from openpyxl.utils import get_column_letter
+                        
+                        # Auto-adjust column widths with better calculation
                         for column in worksheet.columns:
                             max_length = 0
                             column_letter = column[0].column_letter
                             
                             for cell in column:
                                 try:
-                                    if len(str(cell.value)) > max_length:
-                                        max_length = len(str(cell.value))
+                                    # Consider both content length and cell formatting
+                                    cell_length = len(str(cell.value)) if cell.value is not None else 0
+                                    if cell_length > max_length:
+                                        max_length = cell_length
                                 except:
                                     pass
                             
-                            # Set column width with some padding
-                            adjusted_width = min(max_length + 2, 50)  # Max width of 50
-                            worksheet.column_dimensions[column_letter].width = adjusted_width
+                            # Set column width with better scaling
+                            if max_length > 0:
+                                adjusted_width = min(max(max_length + 4, 10), 60)  # Min 10, Max 60
+                                worksheet.column_dimensions[column_letter].width = adjusted_width
+                            else:
+                                worksheet.column_dimensions[column_letter].width = 12
                         
-                        # Add borders and basic formatting
-                        from openpyxl.styles import Border, Side, Font
-                        from openpyxl.utils import get_column_letter
+                        # Define enhanced styling
+                        header_font = Font(bold=True, size=11, name='Arial')
+                        header_fill = PatternFill(start_color='E6E6FA', end_color='E6E6FA', fill_type='solid')
+                        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                        
+                        data_font = Font(size=10, name='Arial')
+                        data_alignment = Alignment(vertical='center', wrap_text=False)
+                        
+                        # Enhanced border styles
+                        thick_border = Border(
+                            left=Side(style='medium'),
+                            right=Side(style='medium'),
+                            top=Side(style='medium'),
+                            bottom=Side(style='medium')
+                        )
                         
                         thin_border = Border(
                             left=Side(style='thin'),
@@ -229,17 +257,41 @@ def convert_pdf_to_excel(pdf_path, xlsx_path):
                             bottom=Side(style='thin')
                         )
                         
-                        # Apply borders to all cells with data
-                        for row in worksheet.iter_rows(min_row=1, max_row=worksheet.max_row, 
-                                                     min_col=1, max_col=worksheet.max_column):
-                            for cell in row:
+                        # Apply enhanced formatting to all cells
+                        for row_idx, row in enumerate(worksheet.iter_rows(min_row=1, max_row=worksheet.max_row, 
+                                                                        min_col=1, max_col=worksheet.max_column), 1):
+                            for col_idx, cell in enumerate(row, 1):
                                 if cell.value is not None:
-                                    cell.border = thin_border
+                                    # Apply borders
+                                    cell.border = thick_border if row_idx == 1 else thin_border
+                                    
+                                    # Apply fonts and alignment
+                                    if row_idx == 1:  # Header row
+                                        cell.font = header_font
+                                        cell.fill = header_fill
+                                        cell.alignment = header_alignment
+                                    else:  # Data rows
+                                        cell.font = data_font
+                                        cell.alignment = data_alignment
+                                        
+                                        # Try to detect numeric values for right alignment
+                                        try:
+                                            float(str(cell.value).replace(',', '').replace('$', ''))
+                                            cell.alignment = Alignment(horizontal='right', vertical='center')
+                                        except (ValueError, AttributeError):
+                                            # Keep left alignment for text
+                                            cell.alignment = Alignment(horizontal='left', vertical='center')
                         
-                        # Make header row bold if it exists
-                        if worksheet.max_row > 0:
-                            for cell in worksheet[1]:
-                                cell.font = Font(bold=True)
+                        # Set row heights for better appearance
+                        for row in range(1, worksheet.max_row + 1):
+                            if row == 1:  # Header row
+                                worksheet.row_dimensions[row].height = 25
+                            else:  # Data rows
+                                worksheet.row_dimensions[row].height = 18
+                        
+                        # Freeze header row for better navigation
+                        if worksheet.max_row > 1:
+                            worksheet.freeze_panes = 'A2'
                         
                         logging.info(f"Added sheet '{sheet_name}' with {len(df)} rows")
             
