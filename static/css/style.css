@@ -1,0 +1,109 @@
+/* Custom styles for PDF to DOCX converter */
+
+.upload-area {
+    border: 3px dashed var(--bs-border-color);
+    border-radius: 0.75rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    background: var(--bs-body-bg);
+}
+
+.upload-area:hover {
+    border-color: var(--bs-primary);
+    background: var(--bs-primary-bg-subtle);
+}
+
+.upload-area.dragover {
+    border-color: var(--bs-success);
+    background: var(--bs-success-bg-subtle);
+    transform: scale(1.02);
+}
+
+.file-info {
+    background: var(--bs-secondary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+}
+
+.feature-icon {
+    padding: 1rem;
+}
+
+/* Progress bar animations */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.converting .upload-area {
+    animation: pulse 2s infinite;
+}
+
+/* Loading spinner */
+.spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--bs-border-color);
+    border-top: 2px solid var(--bs-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .display-4 {
+        font-size: 2rem;
+    }
+    
+    .card-body {
+        padding: 2rem 1.5rem !important;
+    }
+    
+    .upload-area {
+        padding: 2rem 1rem !important;
+    }
+    
+    .btn-lg {
+        font-size: 1rem;
+        padding: 0.75rem 1.5rem;
+    }
+}
+
+/* Custom button styles */
+.btn-success:hover {
+    background-color: var(--bs-success-hover);
+    border-color: var(--bs-success-hover);
+}
+
+/* Alert improvements */
+.alert {
+    border-radius: 0.75rem;
+}
+
+.alert .btn {
+    border-radius: 0.375rem;
+}
+
+/* File size formatting */
+.file-size {
+    font-weight: 500;
+}
+
+/* Success state */
+.conversion-success {
+    background: linear-gradient(135deg, var(--bs-success-bg-subtle), var(--bs-success-bg));
+    border: 1px solid var(--bs-success-border-subtle);
+}
+
+/* Error state */
+.conversion-error {
+    background: linear-gradient(135deg, var(--bs-danger-bg-subtle), var(--bs-danger-bg));
+    border: 1px solid var(--bs-danger-border-subtle);
+}

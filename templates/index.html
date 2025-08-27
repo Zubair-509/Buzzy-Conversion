@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to DOCX Converter</title>
+    
+    <!-- Bootstrap CSS with Replit theme -->
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="min-vh-100 d-flex flex-column">
+        <!-- Header -->
+        <header class="py-4">
+            <div class="container">
+                <div class="text-center">
+                    <h1 class="display-4 mb-2">
+                        <i class="fas fa-file-pdf text-danger me-2"></i>
+                        PDF to DOCX Converter
+                        <i class="fas fa-file-word text-primary ms-2"></i>
+                    </h1>
+                    <p class="lead text-muted">Convert your PDF documents to DOCX format with preserved formatting</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow-1">
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-lg-8">
+                        <!-- Upload Card -->
+                        <div class="card shadow-lg">
+                            <div class="card-body p-5">
+                                <!-- File Upload Area -->
+                                <div id="uploadArea" class="upload-area text-center p-5 mb-4">
+                                    <div class="upload-icon mb-3">
+                                        <i class="fas fa-cloud-upload-alt fa-4x text-muted"></i>
+                                    </div>
+                                    <h4 class="mb-3">Drop your PDF file here</h4>
+                                    <p class="text-muted mb-4">or click to browse from your device</p>
+                                    <button type="button" class="btn btn-outline-primary btn-lg" onclick="document.getElementById('fileInput').click()">
+                                        <i class="fas fa-folder-open me-2"></i>
+                                        Choose File
+                                    </button>
+                                    <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+                                    <div class="mt-3">
+                                        <small class="text-muted">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Maximum file size: 50MB • Supported format: PDF
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <!-- Progress Bar -->
+                                <div id="progressContainer" class="mb-4" style="display: none;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span id="progressText">Processing...</span>
+                                        <span id="progressPercent">0%</span>
+                                    </div>
+                                    <div class="progress">
+                                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                             role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- File Info -->
+                                <div id="fileInfo" class="file-info p-3 mb-4" style="display: none;">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-file-pdf fa-2x text-danger me-3"></i>
+                                        <div class="flex-grow-1">
+                                            <h6 id="fileName" class="mb-1"></h6>
+                                            <small id="fileSize" class="text-muted"></small>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearFile()">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Convert Button -->
+                                <div class="text-center">
+                                    <button id="convertBtn" class="btn btn-success btn-lg px-5" onclick="convertFile()" disabled>
+                                        <i class="fas fa-sync-alt me-2"></i>
+                                        Convert to DOCX
+                                    </button>
+                                </div>
+
+                                <!-- Success Message -->
+                                <div id="successMessage" class="alert alert-success mt-4" style="display: none;">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-check-circle fa-2x text-success me-3"></i>
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">Conversion Successful!</h6>
+                                            <p class="mb-0">Your DOCX file is ready for download.</p>
+                                        </div>
+                                        <a id="downloadBtn" class="btn btn-primary" href="#" download>
+                                            <i class="fas fa-download me-2"></i>
+                                            Download
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- Error Message -->
+                                <div id="errorMessage" class="alert alert-danger mt-4" style="display: none;">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-exclamation-triangle fa-2x text-danger me-3"></i>
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">Conversion Failed</h6>
+                                            <p id="errorText" class="mb-0"></p>
+                                        </div>
+                                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearMessages()">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Features Section -->
+                        <div class="row mt-5">
+                            <div class="col-md-4 mb-4">
+                                <div class="text-center">
+                                    <div class="feature-icon mb-3">
+                                        <i class="fas fa-magic fa-3x text-primary"></i>
+                                    </div>
+                                    <h5>Preserves Formatting</h5>
+                                    <p class="text-muted">Advanced conversion engine maintains document structure, fonts, and layout</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-4">
+                                <div class="text-center">
+                                    <div class="feature-icon mb-3">
+                                        <i class="fas fa-shield-alt fa-3x text-success"></i>
+                                    </div>
+                                    <h5>Secure & Private</h5>
+                                    <p class="text-muted">Files are processed securely and automatically deleted after conversion</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-4">
+                                <div class="text-center">
+                                    <div class="feature-icon mb-3">
+                                        <i class="fas fa-bolt fa-3x text-warning"></i>
+                                    </div>
+                                    <h5>Fast Processing</h5>
+                                    <p class="text-muted">Quick conversion with real-time progress tracking and instant download</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-4 mt-5">
+            <div class="container">
+                <div class="text-center text-muted">
+                    <small>
+                        <i class="fas fa-info-circle me-1"></i>
+                        Convert PDF documents to editable DOCX format while preserving formatting and structure
+                    </small>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
