@@ -136,7 +136,7 @@ def upload_file():
         logging.error(f"Upload error: {str(e)}")
         # Clean up files if they exist
         try:
-            if 'pdf_path' in locals():
+            if 'pdf_path' in locals() and 'pdf_path' in vars():
                 if os.path.exists(pdf_path):
                     os.remove(pdf_path)
         except:
