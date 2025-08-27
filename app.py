@@ -126,9 +126,14 @@ def convert_pdf_to_docx(pdf_path, docx_path):
             return False, f"Conversion failed: {error_msg}"
 
 @app.route('/')
-def index():
-    """Render the main page."""
-    return render_template('index.html')
+def home():
+    """Render the home/landing page."""
+    return render_template('home.html')
+
+@app.route('/pdf-tools')
+def pdf_tools():
+    """Render the PDF tools page."""
+    return render_template('pdf_tools.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
