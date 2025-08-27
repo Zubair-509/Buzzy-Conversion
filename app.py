@@ -53,21 +53,77 @@ def validate_pdf(file_path):
         return False, f"Invalid or corrupted PDF file: {str(e)}"
 
 def convert_pdf_to_docx(pdf_path, docx_path):
-    """Convert PDF to DOCX using pdf2docx library."""
+    """Convert PDF to DOCX using pdf2docx library with enhanced error handling."""
     try:
         logging.info(f"Starting conversion: {pdf_path} -> {docx_path}")
         
-        # Use pdf2docx converter
+        # Validate input file exists and is readable
+        if not os.path.exists(pdf_path):
+            return False, "Input PDF file not found"
+        
+        if os.path.getsize(pdf_path) == 0:
+            return False, "PDF file is empty"
+        
+        # Use pdf2docx converter with specific settings for better compatibility
         cv = pdf2docx.Converter(pdf_path)
-        cv.convert(docx_path, start=0, end=None)
+        
+        # Convert with enhanced settings to preserve formatting
+        cv.convert(
+            docx_path, 
+            start=0, 
+            end=None,
+            multi_processing=False,  # Disable multiprocessing for stability
+            cpu_count=1  # Use single thread for more reliable conversion
+        )
         cv.close()
+        
+        # Validate output file was created and has content
+        if not os.path.exists(docx_path):
+            return False, "DOCX file was not created"
+        
+        if os.path.getsize(docx_path) == 0:
+            return False, "Generated DOCX file is empty"
+        
+        # Basic validation - try to read the file as a DOCX
+        try:
+            from zipfile import ZipFile, BadZipFile
+            with ZipFile(docx_path, 'r') as zip_file:
+                # Check if it contains the required DOCX structure
+                required_files = ['[Content_Types].xml', 'word/document.xml']
+                zip_contents = zip_file.namelist()
+                
+                for required_file in required_files:
+                    if required_file not in zip_contents:
+                        logging.warning(f"DOCX structure check: Missing {required_file}")
+                        
+        except BadZipFile:
+            return False, "Generated file is not a valid DOCX format"
+        except Exception as validation_error:
+            logging.warning(f"DOCX validation warning: {str(validation_error)}")
+            # Continue anyway as the file might still be usable
         
         logging.info(f"Conversion completed successfully: {docx_path}")
         return True, "Conversion completed successfully"
         
+    except ImportError as e:
+        logging.error(f"Missing required library: {str(e)}")
+        return False, "Conversion library not available. Please contact support."
+    except MemoryError:
+        logging.error("Memory error during conversion")
+        return False, "File too large or complex for conversion. Try a smaller file."
     except Exception as e:
         logging.error(f"Conversion error: {str(e)}")
-        return False, f"Conversion failed: {str(e)}"
+        error_msg = str(e)
+        
+        # Provide more user-friendly error messages
+        if "No module named" in error_msg:
+            return False, "Required conversion libraries are not installed"
+        elif "Permission denied" in error_msg:
+            return False, "File access permission error"
+        elif "No such file" in error_msg:
+            return False, "Input file could not be found"
+        else:
+            return False, f"Conversion failed: {error_msg}"
 
 @app.route('/')
 def index():
@@ -153,8 +209,11 @@ def download_file(filename):
             flash('File not found or expired', 'error')
             return redirect(url_for('index'))
         
-        def cleanup_file():
-            """Clean up the file after download."""
+        # Clean up file after a delay to allow download to complete
+        import threading
+        def delayed_cleanup():
+            import time
+            time.sleep(5)  # Wait 5 seconds to ensure download completes
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
@@ -162,14 +221,10 @@ def download_file(filename):
             except Exception as e:
                 logging.error(f"Error cleaning up file: {str(e)}")
         
-        # Schedule cleanup after response
-        @app.after_request
-        def remove_file(response):
-            try:
-                cleanup_file()
-            except Exception as e:
-                logging.error(f"Error in cleanup: {str(e)}")
-            return response
+        # Start cleanup in background thread
+        cleanup_thread = threading.Thread(target=delayed_cleanup)
+        cleanup_thread.daemon = True
+        cleanup_thread.start()
         
         return send_file(
             file_path,
