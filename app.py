@@ -139,45 +139,57 @@ def convert_pdf_to_excel(pdf_path, xlsx_path):
         if os.path.getsize(pdf_path) == 0:
             return False, "PDF file is empty"
         
-        # Extract all tables from the PDF with enhanced formatting detection
+        # Extract all tables from the PDF with enhanced header detection
         try:
-            # First attempt: Use lattice mode for structured tables with better area detection
+            # First attempt: Preserve headers with explicit header detection
             dfs = tabula.read_pdf(
                 pdf_path, 
                 pages='all',
                 multiple_tables=True,
-                pandas_options={'header': 'infer'},
+                pandas_options={'header': [0]},  # Explicitly use first row as header
                 lattice=True,
                 stream=False,
                 guess=False,
-                area=None,  # Auto-detect table areas
-                relative_area=True,  # Use relative coordinates
-                relative_columns=True  # Use relative column positions
+                area=None,
+                relative_area=True,
+                relative_columns=True
             )
             
-            # Second attempt: Stream mode with better column detection
-            if not dfs or len(dfs) == 0:
+            # Second attempt: Try with multiple header rows for complex tables
+            if not dfs or len(dfs) == 0 or any(df.empty for df in dfs):
                 dfs = tabula.read_pdf(
                     pdf_path, 
                     pages='all',
                     multiple_tables=True,
-                    pandas_options={'header': 'infer'},
+                    pandas_options={'header': [0, 1]},  # Try multi-row headers
+                    lattice=True,
+                    stream=False,
+                    guess=False
+                )
+            
+            # Third attempt: Stream mode with header preservation
+            if not dfs or len(dfs) == 0 or any(df.empty for df in dfs):
+                dfs = tabula.read_pdf(
+                    pdf_path, 
+                    pages='all',
+                    multiple_tables=True,
+                    pandas_options={'header': 0},  # Single header row
                     stream=True,
                     guess=True,
                     relative_area=True,
                     relative_columns=True
                 )
             
-            # Third attempt: More aggressive extraction with custom settings
-            if not dfs or len(dfs) == 0:
+            # Fourth attempt: Raw extraction with manual header handling
+            if not dfs or len(dfs) == 0 or any(df.empty for df in dfs):
                 dfs = tabula.read_pdf(
                     pdf_path,
                     pages='all',
                     multiple_tables=True,
-                    pandas_options={'header': None},
+                    pandas_options={'header': None},  # No automatic header
                     lattice=False,
                     stream=True,
-                    guess=False
+                    guess=True
                 )
                 
         except Exception as tabula_error:
@@ -185,7 +197,69 @@ def convert_pdf_to_excel(pdf_path, xlsx_path):
             # Last resort: try to extract any data
             dfs = []
             
-        # Check if we got any data
+        # Process and clean up the dataframes with enhanced header handling
+        processed_dfs = []
+        
+        for i, df in enumerate(dfs):
+            if df is not None and not df.empty:
+                # Handle multi-level column headers
+                if hasattr(df.columns, 'nlevels') and df.columns.nlevels > 1:
+                    # Flatten multi-level columns
+                    df.columns = [
+                        ' '.join([str(c) for c in col if not pd.isna(c) and str(c).strip() != '']) 
+                        if isinstance(col, tuple) else str(col)
+                        for col in df.columns
+                    ]
+                
+                # Clean up column names - preserve original names when possible
+                new_columns = []
+                first_row_used_as_header = False
+                
+                for j, col in enumerate(df.columns):
+                    col_str = str(col).strip()
+                    
+                    # Check if this looks like an actual header (not just "Unnamed")
+                    if (col_str.startswith('Unnamed') or 
+                        pd.isna(col) or 
+                        col_str == '' or
+                        col_str == 'nan' or
+                        col_str.lower() == 'none'):
+                        
+                        # Try to use the first row as header if columns are unnamed
+                        if len(df) > 0 and j < len(df.columns):
+                            potential_header = str(df.iloc[0, j]).strip()
+                            if (potential_header and 
+                                potential_header != 'nan' and 
+                                potential_header.lower() != 'none' and 
+                                len(potential_header) > 0 and
+                                not potential_header.isdigit()):  # Avoid using numbers as headers
+                                new_columns.append(potential_header)
+                                first_row_used_as_header = True
+                            else:
+                                new_columns.append(f"Column_{j+1}")
+                        else:
+                            new_columns.append(f"Column_{j+1}")
+                    else:
+                        new_columns.append(col_str)
+                
+                df.columns = new_columns
+                
+                # Remove the first row if it was used for headers
+                if first_row_used_as_header and len(df) > 0:
+                    df = df.iloc[1:].reset_index(drop=True)
+                
+                # Remove completely empty rows and columns
+                df = df.dropna(axis=0, how='all')  # Remove empty rows
+                df = df.dropna(axis=1, how='all')  # Remove empty columns
+                
+                # Only keep dataframes that have actual data
+                if len(df) > 0 and len(df.columns) > 0:
+                    processed_dfs.append(df)
+        
+        # Update the dataframes list
+        dfs = processed_dfs
+        
+        # Check if we got any data after processing
         if not dfs or len(dfs) == 0:
             return False, "No tables or data found in the PDF. The file might contain only images or be a scanned document."
         
